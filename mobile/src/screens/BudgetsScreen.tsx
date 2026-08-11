@@ -22,13 +22,14 @@ import ProgressBar from '../components/ProgressBar';
 import Screen from '../components/Screen';
 import { categoryColors, colors, expenseCategories, radius } from '../theme';
 import type { Budget } from '../types';
-import { currentMonth, inr, monthLabel } from '../utils/format';
+import { currentMonth, monthLabel, pkr } from '../utils/format';
 
 export default function BudgetsScreen() {
   const month = currentMonth();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editing, setEditing] = useState<Budget | null>(null);
   const [category, setCategory] = useState('');
   const [limit, setLimit] = useState('');
   const [saving, setSaving] = useState(false);
@@ -57,8 +58,17 @@ export default function BudgetsScreen() {
   const overCount = budgets.filter((b) => b.over).length;
 
   const openModal = () => {
+    setEditing(null);
     setCategory(available[0] ?? '');
     setLimit('');
+    setError('');
+    setModalVisible(true);
+  };
+
+  const openEdit = (b: Budget) => {
+    setEditing(b);
+    setCategory(b.category);
+    setLimit(String(b.limit));
     setError('');
     setModalVisible(true);
   };
@@ -72,7 +82,11 @@ export default function BudgetsScreen() {
     setError('');
     setSaving(true);
     try {
-      await budgetsApi.add(category, value, month);
+      if (editing) {
+        await budgetsApi.update(editing.id, category, value, month);
+      } else {
+        await budgetsApi.add(category, value, month);
+      }
       haptics.success();
       setModalVisible(false);
       load();
@@ -83,7 +97,7 @@ export default function BudgetsScreen() {
   };
 
   const confirmDelete = (b: Budget) => {
-    Alert.alert('Remove budget?', `Delete the ${b.category} budget of ${inr(b.limit)}?`, [
+    Alert.alert('Remove budget?', `Delete the ${b.category} budget of ${pkr(b.limit)}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -108,13 +122,13 @@ export default function BudgetsScreen() {
       <View style={styles.overview}>
         <View style={styles.overviewTop}>
           <Text style={styles.month}>{monthLabel(month)}</Text>
-          <Text style={styles.total}>{inr(totalSpent)} / {inr(totalLimit)}</Text>
+          <Text style={styles.total}>{pkr(totalSpent)} / {pkr(totalLimit)}</Text>
         </View>
         <ProgressBar progress={totalLimit ? totalSpent / totalLimit : 0} color={colors.accent} />
         {overCount > 0 ? (
           <Text style={styles.warn}>{overCount} budget{overCount > 1 ? 's' : ''} over limit</Text>
         ) : (
-          <Text style={styles.sub}>{inr(Math.max(totalLimit - totalSpent, 0))} left to budget</Text>
+          <Text style={styles.sub}>{pkr(Math.max(totalLimit - totalSpent, 0))} left to budget</Text>
         )}
       </View>
 
@@ -143,7 +157,7 @@ export default function BudgetsScreen() {
                   <View>
                     <Text style={styles.cardName}>{item.category}</Text>
                     <Text style={styles.cardSpent}>
-                      {inr(item.spent)} spent · {inr(item.remaining)} left
+                      {pkr(item.spent)} spent · {pkr(item.remaining)} left
                     </Text>
                   </View>
                 </View>
@@ -161,7 +175,25 @@ export default function BudgetsScreen() {
                 progress={item.progress}
                 color={item.over ? colors.danger : color}
               />
-              <Text style={styles.cardLimit}>Limit {inr(item.limit)}</Text>
+              <View style={styles.cardFooter}>
+                <Text style={styles.cardLimit}>Limit {pkr(item.limit)}</Text>
+                <View style={styles.cardActions}>
+                  <Pressable
+                    style={styles.iconBtn}
+                    hitSlop={6}
+                    onPress={() => openEdit(item)}
+                  >
+                    <Ionicons name="create-outline" size={17} color={colors.mint} />
+                  </Pressable>
+                  <Pressable
+                    style={styles.iconBtn}
+                    hitSlop={6}
+                    onPress={() => confirmDelete(item)}
+                  >
+                    <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                  </Pressable>
+                </View>
+              </View>
             </Pressable>
           );
         }}
@@ -171,22 +203,30 @@ export default function BudgetsScreen() {
         <Pressable style={styles.modalBackdrop} onPress={() => setModalVisible(false)}>
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>New Budget</Text>
+            <Text style={styles.sheetTitle}>{editing ? 'Edit Budget' : 'New Budget'}</Text>
             <Text style={styles.sectionLabel}>Category</Text>
             <View style={styles.categoryRow}>
-              {available.map((c) => {
-                const active = category === c;
-                const color = categoryColors[c];
-                return (
-                  <Pressable
-                    key={c}
-                    onPress={() => setCategory(c)}
-                    style={[styles.chip, active && { borderColor: color, backgroundColor: `${color}18` }]}
-                  >
-                    <Text style={[styles.chipText, active && { color }]}>{c}</Text>
-                  </Pressable>
-                );
-              })}
+              {editing
+                ? (
+                  <View style={[styles.chip, styles.chipSelected, { borderColor: categoryColors[editing.category] }]}>
+                    <Text style={[styles.chipText, { color: categoryColors[editing.category] }]}>
+                      {editing.category}
+                    </Text>
+                  </View>
+                )
+                : available.map((c) => {
+                    const active = category === c;
+                    const color = categoryColors[c];
+                    return (
+                      <Pressable
+                        key={c}
+                        onPress={() => setCategory(c)}
+                        style={[styles.chip, active && { borderColor: color, backgroundColor: `${color}18` }]}
+                      >
+                        <Text style={[styles.chipText, active && { color }]}>{c}</Text>
+                      </Pressable>
+                    );
+                  })}
             </View>
             <Text style={styles.sectionLabel}>Monthly Limit</Text>
             <AppTextInput
@@ -194,11 +234,11 @@ export default function BudgetsScreen() {
               onChangeText={setLimit}
               keyboardType="decimal-pad"
               placeholder="0"
-              icon={<Text style={styles.currency}>₹</Text>}
+              icon={<Text style={styles.currency}>Rs.</Text>}
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <PrimaryButton
-              label="Save Budget"
+              label={editing ? 'Save Changes' : 'Save Budget'}
               onPress={saveBudget}
               loading={saving}
               disabled={!limit}
@@ -260,6 +300,19 @@ const styles = StyleSheet.create({
   cardName: { color: colors.text, fontSize: 15, fontWeight: '700' },
   cardSpent: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
   cardLimit: { color: colors.textMuted, fontSize: 11, marginTop: 8 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardActions: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  iconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipSelected: { backgroundColor: `${colors.accent}18` },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
   badgeOver: { backgroundColor: `${colors.danger}20` },
   badgeOverText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
@@ -306,3 +359,4 @@ const styles = StyleSheet.create({
   currency: { color: colors.accent, fontSize: 18, fontWeight: '700' },
   error: { color: colors.danger, fontSize: 13, marginBottom: 12 },
 });
+

@@ -10,6 +10,7 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  setAvatar: (avatar: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -60,9 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const setAvatar = useCallback(async (avatar: string) => {
+    const updated = await authApi.avatar(avatar);
+    setUser(updated);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, loading, signIn, signUp, signOut }),
-    [user, loading, signIn, signUp, signOut]
+    () => ({ user, loading, signIn, signUp, signOut, setAvatar }),
+    [user, loading, signIn, signUp, signOut, setAvatar]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

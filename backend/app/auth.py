@@ -36,6 +36,7 @@ def to_public(user: dict) -> dict:
         "id": str(user["_id"]),
         "name": user.get("name"),
         "email": user.get("email"),
+        "avatar": user.get("avatar"),
         "created_at": user.get("created_at"),
     }
 

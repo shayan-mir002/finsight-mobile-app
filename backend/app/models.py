@@ -8,16 +8,21 @@ CATEGORIES = [
     "Food",
     "Transport",
     "Shopping",
-    "Bills",
+    "Electricity Bill",
+    "Gas Bill",
     "Entertainment",
     "Health",
     "Education",
     "Rent",
     "Travel",
+    "Gym",
+    "Grocery",
+    "Petrol",
+    "Stocks",
     "Other",
 ]
 
-PAYMENT_METHODS = ["Cash", "UPI", "Card", "Bank", "Wallet"]
+PAYMENT_METHODS = ["Cash", "EasyPaisa", "JazzCash", "Bank Transfer", "SadaPay"]
 
 
 class RegisterRequest(BaseModel):
@@ -34,6 +39,10 @@ class LoginRequest(BaseModel):
 class AuthResponse(BaseModel):
     token: str
     user: dict
+
+
+class AvatarRequest(BaseModel):
+    avatar: str = Field(min_length=1, max_length=2_000_000)
 
 
 class TransactionIn(BaseModel):

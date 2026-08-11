@@ -22,7 +22,7 @@ const SUGGESTIONS = [
   'Where did I spend the most this month?',
   'What expenses should I reduce?',
   'How much did I spend on food?',
-  'Can I afford to save ₹10,000 this month?',
+  'Can I afford to save Rs 50,000 this month?',
 ];
 
 export default function ChatScreen() {

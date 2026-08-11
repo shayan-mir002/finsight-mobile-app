@@ -1,8 +1,11 @@
-export function inr(amount: number): string {
-  return '₹' + amount.toLocaleString('en-IN', {
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  });
+export function pkr(amount: number): string {
+  return (
+    'Rs. ' +
+    amount.toLocaleString('en-US', {
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+      minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    })
+  );
 }
 
 export function monthLabel(month: string): string {

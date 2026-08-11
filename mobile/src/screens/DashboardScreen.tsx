@@ -3,7 +3,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,63 +15,135 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { BarChart, PieChart } from 'react-native-gifted-charts';
+import { launchImageLibrary } from 'react-native-image-picker';
 
-import { aiApi, transactionsApi } from '../api';
+import { budgetsApi, goalsApi, transactionsApi } from '../api';
 import CategoryIcon from '../components/CategoryIcon';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import Screen from '../components/Screen';
 import { useAuth } from '../context/AuthContext';
 import { categoryColors, colors, radius } from '../theme';
-import type { HistoryPoint, Summary, Transaction } from '../types';
-import { currentMonth, formatDate, inr, monthLabel } from '../utils/format';
+import type { Budget, Goal, HistoryPoint, Summary, Transaction } from '../types';
+import { currentMonth, formatDate, monthLabel, pkr } from '../utils/format';
 
 export default function DashboardScreen({ navigation }: any) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, setAvatar } = useAuth();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [recent, setRecent] = useState<Transaction[]>([]);
-  const [insights, setInsights] = useState<string[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [avatarMenu, setAvatarMenu] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const month = currentMonth();
 
   const load = useCallback(async () => {
-    const [sum, hist, txns] = await Promise.all([
+    const [sum, hist, txns, bgs, gls] = await Promise.all([
       transactionsApi.summary(month),
       transactionsApi.history(),
       transactionsApi.list(),
+      budgetsApi.list(month),
+      goalsApi.list(),
     ]);
     setSummary(sum);
     setHistory(hist);
     setRecent(txns.slice(0, 5));
+    setBudgets(bgs);
+    setGoals(gls);
   }, [month]);
-
-  const loadInsights = useCallback(async () => {
-    setInsightsLoading(true);
-    try {
-      const { insights } = await aiApi.insights();
-      setInsights(insights);
-    } catch {
-      setInsights([]);
-    } finally {
-      setInsightsLoading(false);
-    }
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
       (async () => {
         setLoading(true);
         try {
-          await Promise.all([load(), loadInsights()]);
+          await load();
         } finally {
           setLoading(false);
         }
       })();
-    }, [load, loadInsights])
+    }, [load])
   );
+
+  const pickAvatar = async () => {
+    setAvatarMenu(false);
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      maxWidth: 512,
+      maxHeight: 512,
+      quality: 0.7,
+      selectionLimit: 1,
+    });
+    const asset = result.assets?.[0];
+    if (!asset?.base64) {
+      if (result.errorCode) Alert.alert('Could not open photos', result.errorMessage ?? 'Try again.');
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const mime = asset.type ?? 'image/jpeg';
+      await setAvatar(`data:${mime};base64,${asset.base64}`);
+    } catch (e: any) {
+      Alert.alert('Upload failed', e.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const confirmRemoveAvatar = () => {
+    setAvatarMenu(false);
+    Alert.alert('Remove photo?', 'Your avatar will be cleared.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await setAvatar('');
+          } catch (e: any) {
+            Alert.alert('Remove failed', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const income = summary?.monthly_income ?? 0;
+  const expense = summary?.monthly_expense ?? 0;
+  const savings = income - expense;
+  const savingsRate = income > 0 ? Math.max(0, Math.min(1, savings / income)) : 0;
+  const budgetsOnTrack = budgets.length
+    ? budgets.filter((b) => !b.over).length / budgets.length
+    : 0;
+  const goalProgress = goals.length
+    ? goals.reduce((s, g) => s + Math.min(1, g.progress), 0) / goals.length
+    : 0;
+
+  const healthScore = Math.round(
+    35 +
+    savingsRate * 30 +
+    (budgets.length ? budgetsOnTrack * 20 : 10) +
+    goalProgress * 15
+  );
+  const healthColor =
+    healthScore >= 70 ? colors.mint : healthScore >= 40 ? colors.warn : colors.danger;
+  const verdict =
+    healthScore >= 70
+      ? 'Strong position — keep saving and stay within budgets.'
+      : healthScore >= 40
+        ? 'Good start — trim a few spending areas to go green.'
+        : 'Needs attention — review your budgets and cut overspending.';
+
+  const topCategory = breakdownTop();
+
+  function breakdownTop() {
+    const b = summary?.breakdown ?? [];
+    return b.length ? b.reduce((max, item) => (item.amount > max.amount ? item : max), b[0]) : null;
+  }
 
   const breakdown = summary?.breakdown ?? [];
   const pieData = breakdown.map((b) => ({
@@ -102,8 +176,17 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.greeting}>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},</Text>
             <Text style={styles.name}>{user?.name}</Text>
           </View>
-          <Pressable onPress={signOut} style={styles.avatar} hitSlop={8}>
-            <Ionicons name="log-out-outline" size={20} color={colors.text} />
+          <Pressable onPress={() => setAvatarMenu(true)} hitSlop={8}>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={20} color={colors.text} />
+              </View>
+            )}
+            <View style={styles.cameraBadge}>
+              <Ionicons name="camera" size={10} color={colors.white} />
+            </View>
           </Pressable>
         </View>
 
@@ -115,7 +198,7 @@ export default function DashboardScreen({ navigation }: any) {
         >
           <View style={styles.glow} />
           <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceValue}>{inr(summary?.balance ?? 0)}</Text>
+          <Text style={styles.balanceValue}>{pkr(summary?.balance ?? 0)}</Text>
           <Text style={styles.monthLabel}>{monthLabel(month)}</Text>
         </LinearGradient>
 
@@ -140,6 +223,50 @@ export default function DashboardScreen({ navigation }: any) {
           />
         </View>
 
+        <Card
+          title="Financial Health"
+          style={styles.section}
+          right={<View style={[styles.healthDot, { backgroundColor: healthColor }]} />}
+        >
+          <View style={styles.healthWrap}>
+            <PieChart
+              data={[
+                { value: healthScore, color: healthColor },
+                { value: Math.max(100 - healthScore, 0), color: colors.surfaceAlt },
+              ]}
+              donut
+              radius={52}
+              innerRadius={38}
+              isAnimated
+              strokeColor={colors.surface}
+              strokeWidth={3}
+              centerLabelComponent={() => (
+                <View style={styles.donutCenter}>
+                  <Text style={[styles.healthScore, { color: healthColor }]}>{healthScore}</Text>
+                  <Text style={styles.healthScoreLabel}>/ 100</Text>
+                </View>
+              )}
+            />
+            <View style={styles.healthMetrics}>
+              <HealthMetric label="Savings rate" value={`${Math.round(savingsRate * 100)}%`} />
+              <HealthMetric
+                label="Budgets on track"
+                value={budgets.length ? `${budgets.filter((b) => !b.over).length}/${budgets.length}` : '—'}
+              />
+              <HealthMetric label="Goal progress" value={`${Math.round(goalProgress * 100)}%`} />
+            </View>
+          </View>
+          <Text style={styles.verdict}>{verdict}</Text>
+          {topCategory ? (
+            <View style={styles.insightRow}>
+              <Ionicons name="trending-up" size={15} color={colors.accent} />
+              <Text style={styles.insightText}>
+                {topCategory.category} is your top spending category this month at {pkr(topCategory.amount)}.
+              </Text>
+            </View>
+          ) : null}
+        </Card>
+
         <Card title="Spending Breakdown" style={styles.section}>
           {breakdown.length === 0 ? (
             <EmptyState
@@ -161,7 +288,7 @@ export default function DashboardScreen({ navigation }: any) {
                   <View style={styles.donutCenter}>
                     <Text style={styles.donutLabel}>Spent</Text>
                     <Text style={styles.donutValue}>
-                      {inr(summary?.monthly_expense ?? 0)}
+                      {pkr(summary?.monthly_expense ?? 0)}
                     </Text>
                   </View>
                 )}
@@ -176,7 +303,7 @@ export default function DashboardScreen({ navigation }: any) {
                       ]}
                     />
                     <Text style={styles.legendName}>{b.category}</Text>
-                    <Text style={styles.legendValue}>{inr(b.amount)}</Text>
+                    <Text style={styles.legendValue}>{pkr(b.amount)}</Text>
                   </View>
                 ))}
               </View>
@@ -202,33 +329,6 @@ export default function DashboardScreen({ navigation }: any) {
             />
           </Card>
         )}
-
-        <Card
-          title="AI Insights"
-          style={styles.section}
-          right={
-            <Pressable onPress={loadInsights} hitSlop={8}>
-              {insightsLoading ? (
-                <ActivityIndicator size="small" color={colors.accent} />
-              ) : (
-                <Ionicons name="refresh" size={18} color={colors.accent} />
-              )}
-            </Pressable>
-          }
-        >
-          {insights.length === 0 ? (
-            <Text style={styles.insightsEmpty}>
-              Add some transactions to unlock personalized AI insights.
-            </Text>
-          ) : (
-            insights.map((insight, i) => (
-              <View key={i} style={styles.insightRow}>
-                <Ionicons name="sparkles" size={16} color={colors.accent} />
-                <Text style={styles.insightText}>{insight}</Text>
-              </View>
-            ))
-          )}
-        </Card>
 
         <Card title="Recent Activity" style={styles.section}>
           {recent.length === 0 ? (
@@ -257,13 +357,40 @@ export default function DashboardScreen({ navigation }: any) {
                     { color: t.type === 'income' ? colors.success : colors.text },
                   ]}
                 >
-                  {t.type === 'income' ? '+' : '−'} {inr(t.amount)}
+                  {t.type === 'income' ? '+' : '−'} {pkr(t.amount)}
                 </Text>
               </Pressable>
             ))
           )}
         </Card>
       </ScrollView>
+
+      <Modal
+        visible={avatarMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarMenu(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setAvatarMenu(false)}>
+          <Pressable style={styles.menu} onPress={() => {}}>
+            <Pressable style={styles.menuItem} onPress={pickAvatar}>
+              <Ionicons name="camera-outline" size={18} color={colors.accent} />
+              <Text style={styles.menuText}>{uploadingAvatar ? 'Uploading…' : 'Change photo'}</Text>
+            </Pressable>
+            {user?.avatar ? (
+              <Pressable style={styles.menuItem} onPress={confirmRemoveAvatar}>
+                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                <Text style={[styles.menuText, { color: colors.danger }]}>Remove photo</Text>
+              </Pressable>
+            ) : null}
+            <View style={styles.menuDivider} />
+            <Pressable style={styles.menuItem} onPress={signOut}>
+              <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+              <Text style={[styles.menuText, { color: colors.danger }]}>Sign out</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
@@ -283,7 +410,16 @@ function StatCard({
     <View style={styles.statCard}>
       <Ionicons name={icon} size={16} color={color} />
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{inr(value)}</Text>
+      <Text style={styles.statValue}>{pkr(value)}</Text>
+    </View>
+  );
+}
+
+function HealthMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metricRow}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
     </View>
   );
 }
@@ -309,6 +445,19 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bg,
   },
   balanceCard: {
     marginHorizontal: 20,
@@ -368,12 +517,40 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   section: { marginTop: 16, marginHorizontal: 20 },
+  healthDot: { width: 10, height: 10, borderRadius: 5 },
+  healthWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+  donutCenter: { alignItems: 'center' },
+  healthScore: { fontSize: 26, fontWeight: '800' },
+  healthScoreLabel: { color: colors.textMuted, fontSize: 10 },
+  healthMetrics: { flex: 1, gap: 12 },
+  metricRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  metricLabel: { color: colors.textMuted, fontSize: 12 },
+  metricValue: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  verdict: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 16,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: 12,
+  },
+  insightText: { color: colors.text, fontSize: 12, lineHeight: 18, flex: 1 },
   breakdownWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
   },
-  donutCenter: { alignItems: 'center' },
   donutLabel: { color: colors.textMuted, fontSize: 11 },
   donutValue: { color: colors.text, fontSize: 15, fontWeight: '700', marginTop: 2 },
   legend: { flex: 1, gap: 10 },
@@ -381,14 +558,6 @@ const styles = StyleSheet.create({
   legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   legendName: { color: colors.textMuted, fontSize: 13, flex: 1 },
   legendValue: { color: colors.text, fontSize: 13, fontWeight: '600' },
-  insightsEmpty: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
-  insightRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 12,
-  },
-  insightText: { color: colors.text, fontSize: 13, lineHeight: 19, flex: 1 },
   txnRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -398,4 +567,26 @@ const styles = StyleSheet.create({
   txnName: { color: colors.text, fontSize: 14, fontWeight: '600' },
   txnDate: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   txnAmount: { fontSize: 14, fontWeight: '700' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  menu: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  menuText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  menuDivider: { height: 1, backgroundColor: colors.border },
 });

@@ -37,7 +37,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(todayISO());
-  const [payment, setPayment] = useState('UPI');
+  const [payment, setPayment] = useState('Cash');
   const [notes, setNotes] = useState('');
   const [showPicker, setShowPicker] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +54,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
           setAmount(String(txn.amount));
           setCategory(txn.category);
           setDate(txn.date);
-          setPayment(txn.payment_method ?? 'UPI');
+          setPayment(txn.payment_method ?? 'Cash');
           setNotes(txn.notes ?? '');
         }
       })();
@@ -165,7 +165,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
             onChangeText={setAmount}
             keyboardType="decimal-pad"
             placeholder="0"
-            icon={<Text style={styles.currency}>₹</Text>}
+            icon={<Text style={styles.currency}>Rs.</Text>}
             style={styles.amountInput}
           />
 
@@ -319,3 +319,4 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 13, marginBottom: 12 },
   save: { marginTop: 8 },
 });
+

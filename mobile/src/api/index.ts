@@ -17,6 +17,7 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post<AuthResponse>('/api/auth/login', { email, password }),
   me: () => api.get<User>('/api/auth/me'),
+  avatar: (avatar: string) => api.post<User>('/api/auth/avatar', { avatar }),
 };
 
 export const transactionsApi = {
@@ -39,6 +40,8 @@ export const budgetsApi = {
   list: (month: string) => api.get<Budget[]>(`/api/budgets?month=${month}`),
   add: (category: string, limit: number, month: string) =>
     api.post<Budget>('/api/budgets', { category, limit, month }),
+  update: (id: string, category: string, limit: number, month: string) =>
+    api.put<Budget>(`/api/budgets/${id}`, { category, limit, month }),
   remove: (id: string) => api.delete<void>(`/api/budgets/${id}`),
 };
 
@@ -46,6 +49,8 @@ export const goalsApi = {
   list: () => api.get<Goal[]>('/api/goals'),
   add: (body: { name: string; target_amount: number; current_amount: number; deadline: string }) =>
     api.post<Goal>('/api/goals', body),
+  update: (id: string, body: { name: string; target_amount: number; current_amount: number; deadline: string }) =>
+    api.put<Goal>(`/api/goals/${id}`, body),
   contribute: (id: string, amount: number) =>
     api.post<Goal>(`/api/goals/${id}/contribute?amount=${amount}`),
   remove: (id: string) => api.delete<void>(`/api/goals/${id}`),

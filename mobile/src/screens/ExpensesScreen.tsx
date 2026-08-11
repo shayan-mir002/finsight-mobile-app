@@ -17,7 +17,7 @@ import EmptyState from '../components/EmptyState';
 import Screen from '../components/Screen';
 import { colors, radius } from '../theme';
 import type { Transaction } from '../types';
-import { formatDate, inr } from '../utils/format';
+import { formatDate, pkr } from '../utils/format';
 
 const FILTERS = ['All', 'Expense', 'Income'] as const;
 
@@ -45,7 +45,7 @@ export default function ExpensesScreen({ navigation }: any) {
   const filtered = filter === 'All' ? txns : txns.filter((t) => t.type === filter.toLowerCase());
 
   const confirmDelete = (t: Transaction) => {
-    Alert.alert('Delete transaction?', `Remove ${t.category} — ${inr(t.amount)}?`, [
+    Alert.alert('Delete transaction?', `Remove ${t.category} — ${pkr(t.amount)}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -124,7 +124,7 @@ export default function ExpensesScreen({ navigation }: any) {
                 { color: item.type === 'income' ? colors.success : colors.text },
               ]}
             >
-              {item.type === 'income' ? '+' : '−'} {inr(item.amount)}
+              {item.type === 'income' ? '+' : '−'} {pkr(item.amount)}
             </Text>
           </Pressable>
         )}

@@ -22,12 +22,13 @@ import ProgressBar from '../components/ProgressBar';
 import Screen from '../components/Screen';
 import { colors, radius } from '../theme';
 import type { Goal } from '../types';
-import { formatDate, inr, todayISO } from '../utils/format';
+import { formatDate, pkr, todayISO } from '../utils/format';
 
 export default function GoalsScreen() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editing, setEditing] = useState<Goal | null>(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [current, setCurrent] = useState('');
@@ -56,10 +57,21 @@ export default function GoalsScreen() {
   );
 
   const openModal = () => {
+    setEditing(null);
     setName('');
     setTarget('');
     setCurrent('');
     setDeadline(todayISO());
+    setError('');
+    setModalVisible(true);
+  };
+
+  const openEdit = (g: Goal) => {
+    setEditing(g);
+    setName(g.name);
+    setTarget(String(g.target_amount));
+    setCurrent(String(g.current_amount));
+    setDeadline(g.deadline);
     setError('');
     setModalVisible(true);
   };
@@ -77,12 +89,17 @@ export default function GoalsScreen() {
     setError('');
     setSaving(true);
     try {
-      await goalsApi.add({
+      const body = {
         name: name.trim(),
         target_amount: t,
         current_amount: Number(current) || 0,
         deadline,
-      });
+      };
+      if (editing) {
+        await goalsApi.update(editing.id, body);
+      } else {
+        await goalsApi.add(body);
+      }
       haptics.success();
       setModalVisible(false);
       load();
@@ -173,15 +190,25 @@ export default function GoalsScreen() {
               </Pressable>
             </View>
             <View style={styles.amountRow}>
-              <Text style={styles.current}>{inr(item.current_amount)}</Text>
-              <Text style={styles.of}>of {inr(item.target_amount)}</Text>
+              <Text style={styles.current}>{pkr(item.current_amount)}</Text>
+              <Text style={styles.of}>of {pkr(item.target_amount)}</Text>
             </View>
             <ProgressBar progress={item.progress} color={colors.mint} />
-            {item.progress >= 1 ? (
-              <Text style={styles.complete}>Goal reached! 🎉</Text>
-            ) : (
-              <Text style={styles.remaining}>{inr(item.remaining)} to go</Text>
-            )}
+            <View style={styles.cardFooter}>
+              {item.progress >= 1 ? (
+                <Text style={styles.complete}>Goal reached! 🎉</Text>
+              ) : (
+                <Text style={styles.remaining}>{pkr(item.remaining)} to go</Text>
+              )}
+              <View style={styles.cardActions}>
+                <Pressable style={styles.iconBtn} hitSlop={6} onPress={() => openEdit(item)}>
+                  <Ionicons name="create-outline" size={17} color={colors.mint} />
+                </Pressable>
+                <Pressable style={styles.iconBtn} hitSlop={6} onPress={() => confirmDelete(item)}>
+                  <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                </Pressable>
+              </View>
+            </View>
           </Pressable>
         )}
       />
@@ -190,7 +217,7 @@ export default function GoalsScreen() {
         <Pressable style={styles.modalBackdrop} onPress={() => setModalVisible(false)}>
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>New Goal</Text>
+            <Text style={styles.sheetTitle}>{editing ? 'Edit Goal' : 'New Goal'}</Text>
             <AppTextInput
               label="Goal name"
               value={name}
@@ -203,7 +230,7 @@ export default function GoalsScreen() {
               onChangeText={setTarget}
               keyboardType="decimal-pad"
               placeholder="0"
-              icon={<Text style={styles.currency}>₹</Text>}
+              icon={<Text style={styles.currency}>Rs.</Text>}
             />
             <AppTextInput
               label="Already saved (optional)"
@@ -211,7 +238,7 @@ export default function GoalsScreen() {
               onChangeText={setCurrent}
               keyboardType="decimal-pad"
               placeholder="0"
-              icon={<Text style={styles.currency}>₹</Text>}
+              icon={<Text style={styles.currency}>Rs.</Text>}
             />
             <Text style={styles.label}>Deadline</Text>
             <Pressable style={styles.dateRow} onPress={() => setShowPicker(true)}>
@@ -224,7 +251,7 @@ export default function GoalsScreen() {
             )}
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <PrimaryButton
-              label="Create Goal"
+              label={editing ? 'Save Changes' : 'Create Goal'}
               onPress={saveGoal}
               loading={saving}
               disabled={!name || !target}
@@ -249,7 +276,7 @@ export default function GoalsScreen() {
               onChangeText={setContributeAmount}
               keyboardType="decimal-pad"
               placeholder="0"
-              icon={<Text style={styles.currency}>₹</Text>}
+              icon={<Text style={styles.currency}>Rs.</Text>}
             />
             <PrimaryButton
               label="Add Amount"
@@ -314,6 +341,18 @@ const styles = StyleSheet.create({
   of: { color: colors.textMuted, fontSize: 12, marginLeft: 6 },
   remaining: { color: colors.textMuted, fontSize: 12, marginTop: 10 },
   complete: { color: colors.success, fontSize: 12, marginTop: 10, fontWeight: '700' },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardActions: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  iconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.surface,
@@ -354,3 +393,4 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 13, marginBottom: 12 },
   saveBtn: { marginTop: 8 },
 });
+

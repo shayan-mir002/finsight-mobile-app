@@ -4,9 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth import create_token, get_current_user, hash_password, to_public, verify_password
 from ..database import db
-from ..models import AuthResponse, LoginRequest, RegisterRequest
+from ..models import AuthResponse, AvatarRequest, LoginRequest, RegisterRequest
 
 router = APIRouter()
+
+
+@router.post("/avatar")
+async def update_avatar(payload: AvatarRequest, user: dict = Depends(get_current_user)):
+    if not payload.avatar.startswith("data:image/"):
+        raise HTTPException(422, "Avatar must be a data:image/... URL")
+
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"avatar": payload.avatar}})
+    user["avatar"] = payload.avatar
+    return to_public(user)
 
 
 @router.post("/register", response_model=AuthResponse, status_code=201)
