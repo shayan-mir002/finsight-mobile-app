@@ -1,0 +1,43 @@
+# ---- Environment / secrets ----
+.env
+*.env.local
+backend/.env
+
+# ---- Python (backend) ----
+backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+*.log
+uvicorn*.log
+apk-server*.log
+
+# ---- Node / React Native (mobile) ----
+mobile/node_modules/
+mobile/.expo/
+mobile/_bundle/
+mobile/*.log
+npm-debug.log*
+yarn-error.log*
+
+# Android / iOS build artifacts
+mobile/android/.gradle/
+mobile/android/.kotlin/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+mobile/android/app/.cxx/
+*.keystore
+!debug.keystore
+mobile/ios/Pods/
+mobile/ios/build/
+*.jsbundle
+.DS_Store
+
+# ---- Local dev tooling (not part of the project) ----
+.rn-tmp/
+rn-tmp/
+serve_apk.py
+.github/
