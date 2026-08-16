@@ -1,4 +1,5 @@
 import { api } from './client';
+import { buildAiContext } from '../db';
 import type {
   Budget,
   ChatMessage,
@@ -58,6 +59,8 @@ export const goalsApi = {
 
 export const aiApi = {
   insights: () => api.get<{ insights: string[] }>('/api/ai/insights'),
-  chat: (messages: ChatMessage[]) =>
-    api.post<{ reply: string }>('/api/ai/chat', { messages }),
+  chat: async (messages: ChatMessage[]) => {
+    const context = await buildAiContext();
+    return api.post<{ reply: string }>('/api/ai/chat', { messages, context });
+  },
 };

@@ -24,7 +24,7 @@ function getDB(): DB {
       CREATE TABLE IF NOT EXISTS budgets (
         id TEXT PRIMARY KEY,
         category TEXT NOT NULL,
-        limit REAL NOT NULL,
+        "limit" REAL NOT NULL,
         month TEXT NOT NULL,
         UNIQUE(category, month)
       );
@@ -236,7 +236,7 @@ export async function listBudgets(month: string): Promise<Budget[]> {
 
 export async function addBudget(category: string, limit: number, month: string): Promise<Budget> {
   const id = uid();
-  await getDB().execute('INSERT INTO budgets (id, category, limit, month) VALUES (?, ?, ?, ?)', [
+  await getDB().execute('INSERT INTO budgets (id, category, "limit", month) VALUES (?, ?, ?, ?)', [
     id,
     category,
     round2(limit),
@@ -247,7 +247,7 @@ export async function addBudget(category: string, limit: number, month: string):
 }
 
 export async function updateBudget(id: string, category: string, limit: number, month: string): Promise<void> {
-  await getDB().execute('UPDATE budgets SET category = ?, limit = ?, month = ? WHERE id = ?', [
+  await getDB().execute('UPDATE budgets SET category = ?, "limit" = ?, month = ? WHERE id = ?', [
     category,
     round2(limit),
     month,
@@ -330,7 +330,7 @@ export async function removeGoal(id: string): Promise<void> {
 export async function importBudgets(items: Budget[]): Promise<void> {
   await getDB().transaction(async (tx) => {
     for (const b of items) {
-      await tx.execute('INSERT OR IGNORE INTO budgets (id, category, limit, month) VALUES (?, ?, ?, ?)', [
+      await tx.execute('INSERT OR IGNORE INTO budgets (id, category, "limit", month) VALUES (?, ?, ?, ?)', [
         b.id,
         b.category,
         b.limit,
@@ -349,6 +349,42 @@ export async function importGoals(items: Goal[]): Promise<void> {
       );
     }
   });
+}
+
+export async function buildAiContext(): Promise<string> {
+  const now = new Date();
+  const monthKey = now.toISOString().slice(0, 7);
+  const monthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const [txns, budgets, goals] = await Promise.all([
+    listTransactions(),
+    listBudgets(monthKey),
+    listGoals(),
+  ]);
+
+  const lines: string[] = [];
+  lines.push('TRANSACTIONS (latest first):');
+  if (txns.length) {
+    for (const t of txns.slice(0, 200)) {
+      lines.push(
+        `- ${t.date} | ${t.type} | ${t.category} | Rs.${t.amount} | ${t.payment_method ?? ''} | ${t.notes ?? ''}`
+      );
+    }
+  } else {
+    lines.push('- (no transactions yet)');
+  }
+
+  lines.push(`\nCURRENT MONTH: ${monthLabel}`);
+  if (budgets.length) {
+    lines.push('BUDGETS:');
+    for (const b of budgets) lines.push(`- ${b.month} ${b.category}: limit Rs.${b.limit}`);
+  }
+  if (goals.length) {
+    lines.push('GOALS:');
+    for (const g of goals) {
+      lines.push(`- ${g.name}: Rs.${g.current_amount} / Rs.${g.target_amount} by ${g.deadline}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 export { getDB };

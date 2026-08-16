@@ -17,5 +17,6 @@ async def chat(payload: dict, user: dict = Depends(get_current_user)):
     if not messages:
         return {"reply": "Ask me anything about your finances!"}
 
-    reply = await ai.answer_question(str(user["id"]), messages)
+    context = payload.get("context")
+    reply = await ai.answer_question(str(user["id"]), messages, context=context)
     return {"reply": reply}

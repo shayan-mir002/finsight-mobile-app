@@ -76,8 +76,11 @@ async def generate_insights(user_id: str) -> list[str]:
         return fallback_insights(context)
 
 
-async def answer_question(user_id: str, messages: list[dict]) -> str:
-    context = await build_context(user_id)
+async def answer_question(
+    user_id: str, messages: list[dict], context: str | None = None
+) -> str:
+    if context is None:
+        context = await build_context(user_id)
 
     if client is None:
         return fallback_chat(context)
