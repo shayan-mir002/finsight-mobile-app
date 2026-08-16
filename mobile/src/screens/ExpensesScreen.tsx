@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import { transactionsApi } from '../api';
+import * as db from '../db';
 import CategoryIcon from '../components/CategoryIcon';
 import EmptyState from '../components/EmptyState';
 import Screen from '../components/Screen';
@@ -29,7 +29,7 @@ export default function ExpensesScreen({ navigation }: any) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await transactionsApi.list();
+      const data = await db.listTransactions();
       setTxns(data);
     } finally {
       setLoading(false);
@@ -51,7 +51,7 @@ export default function ExpensesScreen({ navigation }: any) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await transactionsApi.remove(t.id);
+          await db.removeTransaction(t.id);
           load();
         },
       },

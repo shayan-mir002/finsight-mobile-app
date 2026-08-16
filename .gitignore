@@ -13,6 +13,7 @@ __pycache__/
 *.log
 uvicorn*.log
 apk-server*.log
+backend/finsight.db
 
 # ---- Node / React Native (mobile) ----
 mobile/node_modules/

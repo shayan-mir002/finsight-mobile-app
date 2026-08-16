@@ -79,36 +79,3 @@ class GoalIn(BaseModel):
 class GoalOut(GoalIn):
     id: str
     created_at: Optional[str] = None
-
-
-def transaction_doc(doc: dict) -> dict:
-    return {
-        "id": str(doc["_id"]),
-        "type": doc.get("type"),
-        "amount": doc.get("amount"),
-        "category": doc.get("category"),
-        "date": doc.get("date"),
-        "payment_method": doc.get("payment_method"),
-        "notes": doc.get("notes"),
-        "created_at": doc.get("created_at"),
-    }
-
-
-def budget_doc(doc: dict) -> dict:
-    return {
-        "id": str(doc["_id"]),
-        "category": doc.get("category"),
-        "limit": doc.get("limit"),
-        "month": doc.get("month"),
-    }
-
-
-def goal_doc(doc: dict) -> dict:
-    return {
-        "id": str(doc["_id"]),
-        "name": doc.get("name"),
-        "target_amount": doc.get("target_amount"),
-        "current_amount": doc.get("current_amount"),
-        "deadline": doc.get("deadline"),
-        "created_at": doc.get("created_at"),
-    }

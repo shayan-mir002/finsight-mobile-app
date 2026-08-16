@@ -1,6 +1,7 @@
 from datetime import date
 
 from ..config import GROQ_API_KEY, GROQ_MODEL
+from ..database import list_all_budgets, list_goals, list_transactions
 
 SYSTEM_PROMPT = """You are FinSight, a friendly personal finance AI assistant. \
 You help users understand their spending, savings and goals based ONLY on their transaction data. \
@@ -14,10 +15,10 @@ if GROQ_API_KEY:
     client = Groq(api_key=GROQ_API_KEY)
 
 
-async def build_context(db, user_id: str) -> str:
-    txns = await db.transactions.find({"user_id": user_id}).sort("date", -1).to_list(500)
-    budgets = await db.budgets.find({"user_id": user_id}).to_list(None)
-    goals = await db.goals.find({"user_id": user_id}).to_list(None)
+async def build_context(user_id: str) -> str:
+    txns = await list_transactions(user_id)
+    budgets = await list_all_budgets(user_id)
+    goals = await list_goals(user_id)
 
     lines = ["TRANSACTIONS (latest first):"]
     if txns:
@@ -42,8 +43,8 @@ async def build_context(db, user_id: str) -> str:
     return "\n".join(lines)
 
 
-async def generate_insights(db, user_id: str) -> list[str]:
-    context = await build_context(db, user_id)
+async def generate_insights(user_id: str) -> list[str]:
+    context = await build_context(user_id)
     if client is None:
         return fallback_insights(context)
 
@@ -75,8 +76,8 @@ async def generate_insights(db, user_id: str) -> list[str]:
         return fallback_insights(context)
 
 
-async def answer_question(db, user_id: str, messages: list[dict]) -> str:
-    context = await build_context(db, user_id)
+async def answer_question(user_id: str, messages: list[dict]) -> str:
+    context = await build_context(user_id)
 
     if client is None:
         return fallback_chat(context)

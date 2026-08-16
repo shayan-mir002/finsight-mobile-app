@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { transactionsApi } from '../api';
+import * as db from '../db';
 import AppTextInput from '../components/AppTextInput';
 import PrimaryButton from '../components/PrimaryButton';
 import Screen from '../components/Screen';
@@ -47,7 +47,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     useCallback(() => {
       if (!editId) return;
       (async () => {
-        const all = await transactionsApi.list();
+        const all = await db.listTransactions();
         const txn = all.find((t) => t.id === editId);
         if (txn) {
           setType(txn.type);
@@ -85,9 +85,9 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     try {
       const body = { type, amount: value, category, date, payment_method: payment, notes };
       if (isEdit) {
-        await transactionsApi.update(editId, body);
+        await db.updateTransaction(editId, body);
       } else {
-        await transactionsApi.add(body);
+        await db.addTransaction(body);
       }
       haptics.success();
       navigation.goBack();
@@ -105,7 +105,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await transactionsApi.remove(editId);
+          await db.removeTransaction(editId);
           navigation.goBack();
         },
       },

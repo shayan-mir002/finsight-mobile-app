@@ -2,12 +2,11 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from bson import ObjectId
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .config import JWT_ALGO, JWT_EXPIRE_DAYS, JWT_SECRET
-from .database import db
+from .database import get_user_by_id
 
 security = HTTPBearer(auto_error=False)
 
@@ -33,7 +32,7 @@ def create_token(user_id: str) -> str:
 
 def to_public(user: dict) -> dict:
     return {
-        "id": str(user["_id"]),
+        "id": str(user["id"]),
         "name": user.get("name"),
         "email": user.get("email"),
         "avatar": user.get("avatar"),
@@ -51,7 +50,7 @@ async def get_current_user(
     except jwt.PyJWTError:
         raise HTTPException(401, "Invalid or expired token")
 
-    user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+    user = await get_user_by_id(str(payload["sub"]))
     if user is None:
         raise HTTPException(401, "User not found")
     return user

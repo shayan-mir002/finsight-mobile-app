@@ -22,4 +22,4 @@ app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "db": "expense"}
+    return {"status": "ok", "db": "sqlite"}

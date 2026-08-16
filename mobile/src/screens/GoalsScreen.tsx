@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { goalsApi } from '../api';
+import * as db from '../db';
 import AppTextInput from '../components/AppTextInput';
 import EmptyState from '../components/EmptyState';
 import PrimaryButton from '../components/PrimaryButton';
@@ -44,7 +44,7 @@ export default function GoalsScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setGoals(await goalsApi.list());
+      setGoals(await db.listGoals());
     } finally {
       setLoading(false);
     }
@@ -96,9 +96,9 @@ export default function GoalsScreen() {
         deadline,
       };
       if (editing) {
-        await goalsApi.update(editing.id, body);
+        await db.updateGoal(editing.id, body);
       } else {
-        await goalsApi.add(body);
+        await db.addGoal(body);
       }
       haptics.success();
       setModalVisible(false);
@@ -114,7 +114,7 @@ export default function GoalsScreen() {
     if (!amt || amt <= 0 || !contributeGoal) return;
     setContributing(true);
     try {
-      await goalsApi.contribute(contributeGoal.id, amt);
+      await db.contributeGoal(contributeGoal.id, amt);
       haptics.success();
       setContributeGoal(null);
       setContributeAmount('');
@@ -138,7 +138,7 @@ export default function GoalsScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await goalsApi.remove(g.id);
+          await db.removeGoal(g.id);
           load();
         },
       },

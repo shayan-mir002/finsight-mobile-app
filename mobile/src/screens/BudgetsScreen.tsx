@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import { budgetsApi } from '../api';
+import * as db from '../db';
 import AppTextInput from '../components/AppTextInput';
 import CategoryIcon from '../components/CategoryIcon';
 import EmptyState from '../components/EmptyState';
@@ -38,7 +38,7 @@ export default function BudgetsScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setBudgets(await budgetsApi.list(month));
+      setBudgets(await db.listBudgets(month));
     } finally {
       setLoading(false);
     }
@@ -83,9 +83,9 @@ export default function BudgetsScreen() {
     setSaving(true);
     try {
       if (editing) {
-        await budgetsApi.update(editing.id, category, value, month);
+        await db.updateBudget(editing.id, category, value, month);
       } else {
-        await budgetsApi.add(category, value, month);
+        await db.addBudget(category, value, month);
       }
       haptics.success();
       setModalVisible(false);
@@ -103,7 +103,7 @@ export default function BudgetsScreen() {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          await budgetsApi.remove(b.id);
+          await db.removeBudget(b.id);
           load();
         },
       },

@@ -2,7 +2,7 @@
 
 FinSight is a full-stack personal finance application that helps you track income and expenses, manage budgets, reach savings goals, and understand your money with the help of an AI assistant.
 
-![React Native](https://img.shields.io/badge/React%20Native-0.81-61DAFB?logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi) ![MongoDB](https://img.shields.io/badge/MongoDB-Motor-47A248?logo=mongodb) ![Groq](https://img.shields.io/badge/AI-Groq%20LLaMA-FF6500)
+![React Native](https://img.shields.io/badge/React%20Native-0.81-61DAFB?logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi) ![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite) ![Groq](https://img.shields.io/badge/AI-Groq%20LLaMA-FF6500)
 
 ---
 
@@ -39,7 +39,7 @@ FinSight is a full-stack personal finance application that helps you track incom
 |-----------|-------------------------------------------------------------------|
 | Mobile    | React Native 0.81, TypeScript, React Navigation, Gifted Charts, AsyncStorage |
 | Backend   | Python 3, FastAPI, Uvicorn                                        |
-| Database  | MongoDB (via Motor async driver)                                  |
+| Database  | SQLite on device (op-sqlite) + SQLite backend (aiosqlite)        |
 | Auth      | JWT (PyJWT) + bcrypt                                              |
 | AI        | Groq API (LLaMA 3.3 70B), with rule-based fallbacks when offline  |
 
@@ -50,19 +50,20 @@ FinSight is a full-stack personal finance application that helps you track incom
 │  React Native   │ ──────────────────► │     FastAPI      │
 │     Mobile      │   /api/...          │      Backend     │
 │      App        │ ◄────────────────── │                  │
-└─────────────────┘    JSON responses   └────────┬─────────┘
-                                                 │
-                                          ┌──────▼──────┐
-                                          │   MongoDB   │
-                                          └─────────────┘
-                                                 │
-                                          ┌──────▼──────┐
-                                          │    Groq     │
-                                          │   (AI API)  │
-                                          └─────────────┘
+│  ┌───────────┐  │    JSON responses   └────────┬─────────┘
+│  │  SQLite   │  │                              │
+│  │ (op-sqlite│  │                        ┌──────▼──────┐
+│  └───────────┘  │                        │   SQLite    │
+│  local storage  │                        │ (aiosqlite) │
+└─────────────────┘                        └──────┬──────┘
+                                                  │
+                                           ┌──────▼──────┐
+                                           │    Groq     │
+                                           │   (AI API)  │
+                                           └─────────────┘
 ```
 
-The mobile app talks to the backend REST API over HTTP(S). The backend owns all business logic, persists data in MongoDB, and calls Groq for AI features.
+The mobile app is **local-first**: transactions, budgets and goals are stored in on-device SQLite and work fully offline. The FastAPI backend persists to its own SQLite file and is used for authentication and the AI chat/insights features (Groq), with a one-time import of existing server data on first launch.
 
 ## Project Structure
 
@@ -72,7 +73,7 @@ finsight-mobile-app/
 │   ├── app/
 │   │   ├── main.py           # App entry point, routes, CORS
 │   │   ├── config.py         # Environment configuration
-│   │   ├── database.py       # MongoDB (Motor) connection
+│   │   ├── database.py       # SQLite (aiosqlite) repository
 │   │   ├── models.py         # Pydantic request/response models
 │   │   ├── auth.py           # Password hashing + JWT helpers
 │   │   ├── routers/          # auth, transactions, budgets, goals, ai
@@ -98,7 +99,6 @@ finsight-mobile-app/
 
 - [Node.js](https://nodejs.org) ≥ 20 and npm
 - [Python](https://www.python.org) ≥ 3.10
-- [MongoDB](https://www.mongodb.com) running locally (or a MongoDB Atlas cluster)
 - Android Studio / Xcode for running the mobile app (or a connected device)
 - (Optional) A [Groq](https://console.groq.com) API key for AI features
 
@@ -119,8 +119,7 @@ pip install -r requirements.txt
 Create a `.env` file (copy from `.env.example`):
 
 ```env
-MONGO_URI=mongodb://localhost:27017
-MONGO_DB=expense
+DB_PATH=finsight.db
 JWT_SECRET=change-me-to-a-random-secret
 GROQ_API_KEY=your-groq-api-key
 ```
@@ -161,12 +160,11 @@ npm run ios      # build & run on iOS (macOS only)
 
 ### Backend (`backend/.env`)
 
-| Variable         | Required | Default                   | Description                              |
-|------------------|----------|---------------------------|------------------------------------------|
-| `MONGO_URI`      | Yes      | `mongodb://localhost:27017` | MongoDB connection string              |
-| `MONGO_DB`       | No       | `expense`                 | Database name                            |
-| `JWT_SECRET`     | Yes      | —                         | Secret used to sign auth tokens          |
-| `GROQ_API_KEY`   | No       | —                         | Groq key for AI features (falls back to rule-based if empty) |
+| Variable         | Required | Default       | Description                              |
+|------------------|----------|---------------|------------------------------------------|
+| `DB_PATH`        | No       | `finsight.db` | Path to the SQLite database file         |
+| `JWT_SECRET`     | Yes      | —             | Secret used to sign auth tokens          |
+| `GROQ_API_KEY`   | No       | —             | Groq key for AI features (falls back to rule-based if empty) |
 
 ### Mobile (`mobile/.env`)
 
@@ -206,11 +204,9 @@ All endpoints except auth/health require a `Authorization: Bearer <token>` heade
 
 Deploying the backend to the cloud keeps the app working even when your local machine is off.
 
-### Database — MongoDB Atlas (free)
+### Database — SQLite
 
-1. Create a free cluster at [MongoDB Atlas](https://www.mongodb.com/atlas).
-2. Create a database user and allow network access from `0.0.0.0/0`.
-3. Copy the connection string (`mongodb+srv://user:password@cluster...`).
+The backend uses a single-file SQLite database (`finsight.db`) created automatically on first run. No external database service is required.
 
 ### Backend — Render (free)
 

@@ -17,7 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { BarChart, PieChart } from 'react-native-gifted-charts';
 import { launchImageLibrary } from 'react-native-image-picker';
 
-import { budgetsApi, goalsApi, transactionsApi } from '../api';
+import * as db from '../db';
 import CategoryIcon from '../components/CategoryIcon';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
@@ -42,11 +42,11 @@ export default function DashboardScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     const [sum, hist, txns, bgs, gls] = await Promise.all([
-      transactionsApi.summary(month),
-      transactionsApi.history(),
-      transactionsApi.list(),
-      budgetsApi.list(month),
-      goalsApi.list(),
+      db.getSummary(month),
+      db.getHistory(),
+      db.listTransactions(),
+      db.listBudgets(month),
+      db.listGoals(),
     ]);
     setSummary(sum);
     setHistory(hist);

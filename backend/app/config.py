@@ -4,8 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DB = os.getenv("MONGO_DB", "expense")
+DB_PATH = os.getenv("DB_PATH", "finsight.db")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGO = "HS256"
 JWT_EXPIRE_DAYS = 30
